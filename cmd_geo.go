@@ -8,8 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mmcloughlin/geohash"
-
+	"github.com/alicebob/miniredis/v2/geohash"
 	"github.com/alicebob/miniredis/v2/server"
 )
 
@@ -65,7 +64,7 @@ func (m *Miniredis) cmdGeoAdd(c *server.Peer, cmd string, args []string) {
 				return
 			}
 
-			score := geohash.EncodeIntWithPrecision(latitude, longitude, 64)
+			score := geohash.EncodeIntWithPrecision(latitude, longitude, 52)
 			toSet[name] = float64(score)
 		}
 
@@ -154,7 +153,7 @@ func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
 
 		membersWithinRadius := []geoRadiusResponse{}
 		for _, el := range members {
-			elLat, elLo := geohash.DecodeIntWithPrecision(uint64(el.score), 64)
+			elLat, elLo := geohash.DecodeIntWithPrecision(uint64(el.score), 52)
 			distanceInMeter := distance(latitude, longitude, elLat, elLo)
 
 			if distanceInMeter <= radius {

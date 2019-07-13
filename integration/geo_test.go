@@ -16,6 +16,8 @@ func TestGeo(t *testing.T) {
 			"15.087269", "37.502669", "Catania",
 		),
 		succ("ZRANGE", "Sicily", 0, -1),
+		succ("ZRANGE", "Sicily", 0, -1, "WITHSCORES"),
+
 		succ("GEOADD",
 			"mountains",
 			"86.9248308", "27.9878675", "Everest",
