@@ -6,7 +6,10 @@ import (
 	"math"
 )
 
-const ENC_LAT = 85.05112878
+const (
+	ENC_LAT  = 85.05112878
+	ENC_LONG = 180.0
+)
 
 // Direction represents directions in the latitute/longitude space.
 type Direction int
@@ -43,7 +46,7 @@ func EncodeWithPrecision(lat, lng float64, chars uint) string {
 // for certain architectures.
 func EncodeInt(lat, lng float64) uint64 {
 	latInt := encodeRange(lat, ENC_LAT)
-	lngInt := encodeRange(lng, 180)
+	lngInt := encodeRange(lng, ENC_LONG)
 	return interleave(latInt, lngInt)
 }
 
@@ -119,7 +122,7 @@ func BoundingBoxIntWithPrecision(hash uint64, bits uint) Box {
 	fullHash := hash << (64 - bits)
 	latInt, lngInt := deinterleave(fullHash)
 	lat := decodeRange(latInt, ENC_LAT)
-	lng := decodeRange(lngInt, 180)
+	lng := decodeRange(lngInt, ENC_LONG)
 	latErr, lngErr := errorWithPrecision(bits)
 	return Box{
 		MinLat: lat,

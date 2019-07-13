@@ -2,13 +2,11 @@
 
 package main
 
-// GEO keys.
-
 import (
 	"testing"
 )
 
-func TestGeo(t *testing.T) {
+func TestGeoadd(t *testing.T) {
 	testCommands(t,
 		succ("GEOADD",
 			"Sicily",
@@ -70,6 +68,23 @@ func TestGeo(t *testing.T) {
 }
 
 func TestGeoradius(t *testing.T) {
+	testCommands(t,
+		succ("GEOADD",
+			"stations",
+			-73.99106999861966, 40.73005400028978, "Astor Pl",
+			-74.00019299927328, 40.71880300107709, "Canal St",
+			-73.98384899986625, 40.76172799961419, "50th St",
+		),
+		succ("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km"),
+		// FIXME: the distances don't match
+		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "WITHDIST"),
+		// redis has more precision in the coords
+		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "WITHCOORD"),
+	)
+}
+
+// a bit longer testset
+func TestGeo(t *testing.T) {
 	// some subway stations
 	// https://data.cityofnewyork.us/Transportation/Subway-Stations/arq3-7z49/data
 	testCommands(t,
@@ -551,6 +566,7 @@ func TestGeoradius(t *testing.T) {
 		),
 		succ("ZRANGE", "stations", 0, -1),
 		succ("ZRANGE", "stations", 0, -1, "WITHSCORES"),
+		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km"),
 		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "WITHDIST"),
 		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "WITHCOORD"),
 	)

@@ -4,11 +4,9 @@ package miniredis
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 
-	"github.com/alicebob/miniredis/v2/geohash"
 	"github.com/alicebob/miniredis/v2/server"
 )
 
@@ -64,8 +62,7 @@ func (m *Miniredis) cmdGeoAdd(c *server.Peer, cmd string, args []string) {
 				return
 			}
 
-			score := geohash.EncodeIntWithPrecision(latitude, longitude, 52)
-			toSet[name] = float64(score)
+			toSet[name] = float64(toGeohash(longitude, latitude))
 		}
 
 		set := 0
@@ -78,7 +75,7 @@ func (m *Miniredis) cmdGeoAdd(c *server.Peer, cmd string, args []string) {
 	})
 }
 
-type geoRadiusResponse struct {
+type geoDistance struct {
 	Name      string
 	Distance  float64
 	Longitude float64
@@ -117,16 +114,16 @@ func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
 		c.WriteError(errWrongNumber(cmd))
 		return
 	}
-	unit := args[4]
-	switch unit {
+	multiplier := 1.0
+	switch args[4] {
 	case "m":
-		break
+		multiplier = 1
 	case "km":
-		radius = radius * 1000
+		multiplier = 1000
 	case "mi":
-		radius = radius * 1609.34
+		multiplier = 1609.34
 	case "ft":
-		radius = radius * 0.3048
+		multiplier = 0.3048
 	default:
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
@@ -150,77 +147,50 @@ func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 		members := db.ssetElements(key)
 
-		membersWithinRadius := []geoRadiusResponse{}
-		for _, el := range members {
-			elLat, elLo := geohash.DecodeIntWithPrecision(uint64(el.score), 52)
-			distanceInMeter := distance(latitude, longitude, elLat, elLo)
+		matches := withinRadius(members, longitude, latitude, radius*multiplier)
 
-			if distanceInMeter <= radius {
-				membersWithinRadius = append(membersWithinRadius, geoRadiusResponse{
-					Name:      el.member,
-					Distance:  distanceInMeter,
-					Longitude: longitude,
-					Latitude:  latitude,
-				})
+		c.WriteLen(len(matches))
+		for _, member := range matches {
+			if !withDist && !withCoord {
+				c.WriteBulk(member.Name)
+				continue
 			}
-		}
 
-		c.WriteLen(len(membersWithinRadius))
-		for _, member := range membersWithinRadius {
+			len := 1
 			if withDist {
-				if withCoord {
-					c.WriteLen(3)
-				} else {
-					c.WriteLen(2)
-				}
-				c.WriteBulk(member.Name)
-				c.WriteBulk(fmt.Sprintf("%f", member.Distance))
-			} else {
-				if withCoord {
-					c.WriteLen(2)
-				} else {
-					c.WriteLen(1)
-				}
-				c.WriteBulk(member.Name)
+				len++
 			}
-
+			if withCoord {
+				len++
+			}
+			c.WriteLen(len)
+			c.WriteBulk(member.Name)
+			if withDist {
+				c.WriteBulk(fmt.Sprintf("%.04f", member.Distance/multiplier))
+			}
 			if withCoord {
 				c.WriteLen(2)
-				c.WriteBulk(fmt.Sprintf("%f", member.Longitude))
-				c.WriteBulk(fmt.Sprintf("%f", member.Latitude))
+				c.WriteBulk(formatGeo(member.Longitude))
+				c.WriteBulk(formatGeo(member.Latitude))
 			}
 		}
 	})
 }
 
-// haversin(θ) function
-func hsin(theta float64) float64 {
-	return math.Pow(math.Sin(theta/2), 2)
-}
+func withinRadius(members []ssElem, longitude, latitude, radius float64) []geoDistance {
+	matches := []geoDistance{}
+	for _, el := range members {
+		elLo, elLat := fromGeohash(uint64(el.score))
+		distanceInMeter := distance(latitude, longitude, elLat, elLo)
 
-// distance function returns the distance (in meters) between two points of
-//     a given longitude and latitude relatively accurately (using a spherical
-//     approximation of the Earth) through the Haversin Distance Formula for
-//     great arc distance on a sphere with accuracy for small distances
-//
-// point coordinates are supplied in degrees and converted into rad. in the func
-//
-// distance returned is meters
-// http://en.wikipedia.org/wiki/Haversine_formula
-// Source: https://gist.github.com/cdipaolo/d3f8db3848278b49db68
-func distance(lat1, lon1, lat2, lon2 float64) float64 {
-	// convert to radians
-	// must cast radius as float to multiply later
-	var la1, lo1, la2, lo2, r float64
-	la1 = lat1 * math.Pi / 180
-	lo1 = lon1 * math.Pi / 180
-	la2 = lat2 * math.Pi / 180
-	lo2 = lon2 * math.Pi / 180
-
-	r = 6378100 // Earth radius in METERS
-
-	// calculate
-	h := hsin(la2-la1) + math.Cos(la1)*math.Cos(la2)*hsin(lo2-lo1)
-
-	return 2 * r * math.Asin(math.Sqrt(h))
+		if distanceInMeter <= radius {
+			matches = append(matches, geoDistance{
+				Name:      el.member,
+				Distance:  distanceInMeter,
+				Longitude: elLo,
+				Latitude:  elLat,
+			})
+		}
+	}
+	return matches
 }

@@ -333,14 +333,24 @@ func looselyEqual(a, b interface{}) bool {
 }
 
 func dump(r interface{}, prefix string) {
-	if ls, ok := r.([]interface{}); ok {
+	switch ls := r.(type) {
+	case []interface{}:
 		for _, k := range ls {
 			switch k := k.(type) {
 			case []byte:
 				fmt.Printf(" %s %s\n", prefix, string(k))
+			case []interface{}:
+				fmt.Printf(" %s:\n", prefix)
+				for _, c := range k {
+					dump(c, "      -")
+				}
 			default:
 				fmt.Printf(" %s %#v\n", prefix, k)
 			}
 		}
+	case []byte:
+		fmt.Printf(" %s %v\n", prefix, string(ls))
+	default:
+		fmt.Printf(" %s %v\n", prefix, ls)
 	}
 }

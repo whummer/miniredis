@@ -47,13 +47,12 @@ func TestGeo(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	{
-		_, err := c.Do("GEOADD", "Sicily", 13.361389, 38.115556, "Palermo")
-		ok(t, err)
-		_, err = c.Do("GEOADD", "Sicily", 15.087269, 37.502669, "Catania")
-		ok(t, err)
+	_, err = c.Do("GEOADD", "Sicily", 13.361389, 38.115556, "Palermo")
+	ok(t, err)
+	_, err = c.Do("GEOADD", "Sicily", 15.087269, 37.502669, "Catania")
+	ok(t, err)
 
-		// GEORADIUS + WITHDIST + WITHCOORD
+	t.Run("WITHDIST WITHCOORD", func(t *testing.T) {
 		res, err := redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200, "km", "WITHDIST", "WITHCOORD"))
 		ok(t, err)
 		equals(t, 2, len(res))
@@ -75,9 +74,10 @@ func TestGeo(t *testing.T) {
 				t.Errorf("latitude/longitude shouldn't be empty")
 			}
 		}
+	})
 
-		// GEORADIUS + WITHCOORD
-		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200, "km", "WITHCOORD"))
+	t.Run("WITHCOORD", func(t *testing.T) {
+		res, err := redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200, "km", "WITHCOORD"))
 		ok(t, err)
 		equals(t, 2, len(res))
 		for _, loc := range res {
@@ -95,64 +95,65 @@ func TestGeo(t *testing.T) {
 				t.Errorf("latitude/longitude shouldn't be empty")
 			}
 		}
+	})
 
-		// GEORADIUS + WITHDIST
-		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200, "km", "WITHDIST"))
+	t.Run("WITHDIST", func(t *testing.T) {
+		// in km
+		res, err := redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200, "km", "WITHDIST"))
 		ok(t, err)
 		equals(t, 2, len(res))
-		for _, loc := range res {
-			item := loc.([]interface{})
-			var (
-				name, _     = redis.String(item[0], nil)
-				distance, _ = redis.Float64(item[1], nil)
-			)
-			equals(t, 2, len(item))
-			if name != "Catania" && name != "Palermo" {
-				t.Errorf("unexpected name %q", name)
-			}
-			if distance == 0.00 {
-				t.Errorf("distance shouldn't be empty")
-			}
-		}
+		var (
+			name1, name2 string
+			dist1, dist2 float64
+		)
+		leftover, err := redis.Scan(res[0].([]interface{}), &name1, &dist1)
+		ok(t, err)
+		equals(t, 0, len(leftover))
+		equals(t, "Palermo", name1)
+		equals(t, 190.6010, dist1) // in km
+		_, err = redis.Scan(res[1].([]interface{}), &name2, &dist2)
+		ok(t, err)
+		equals(t, "Catania", name2)
+		equals(t, 56.4881, dist2)
 
-		// No optional parameters
-		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200, "km"))
+		// in meter
+		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200000, "m", "WITHDIST"))
 		ok(t, err)
 		equals(t, 2, len(res))
-		for _, loc := range res {
-			item := loc.([]interface{})
-			var (
-				name, _ = redis.String(item[0], nil)
-			)
-			equals(t, 1, len(item))
-			if name != "Catania" && name != "Palermo" {
-				t.Errorf("unexpected name %q", name)
-			}
-		}
+		distance, err := redis.Float64(res[0].([]interface{})[1], nil)
+		ok(t, err)
+		equals(t, 190601.0142, distance) // in meter
+	})
+
+	t.Run("no args", func(t *testing.T) {
+		res, err := redis.Strings(c.Do("GEORADIUS", "Sicily", 15, 37, 200, "km"))
+		ok(t, err)
+		equals(t, 2, len(res))
+		equals(t, []string{"Palermo", "Catania"}, res)
 
 		// Too small radius
-		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 1, "km"))
+		res, err = redis.Strings(c.Do("GEORADIUS", "Sicily", 15, 37, 1, "km"))
 		ok(t, err)
 		equals(t, 0, len(res))
 
 		// Wrong coords
-		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 80, 80, 200, "km"))
+		res, err = redis.Strings(c.Do("GEORADIUS", "Sicily", 80, 80, 200, "km"))
 		ok(t, err)
 		equals(t, 0, len(res))
 
 		// Wrong map key
-		res, err = redis.Values(c.Do("GEORADIUS", "Capri", 15, 37, 200, "km"))
+		res, err = redis.Strings(c.Do("GEORADIUS", "Capri", 15, 37, 200, "km"))
 		ok(t, err)
 		equals(t, 0, len(res))
 
 		// Unsupported/unknown distance unit
-		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200, "mm"))
+		res, err = redis.Strings(c.Do("GEORADIUS", "Sicily", 15, 37, 200, "mm"))
 		mustFail(t, err, "ERR wrong number of arguments for 'georadius' command")
 		equals(t, 0, len(res))
 
 		// Wrong parameter type
-		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", "abc", "def", "ghi", "m"))
+		res, err = redis.Strings(c.Do("GEORADIUS", "Sicily", "abc", "def", "ghi", "m"))
 		mustFail(t, err, "ERR wrong number of arguments for 'georadius' command")
 		equals(t, 0, len(res))
-	}
+	})
 }
