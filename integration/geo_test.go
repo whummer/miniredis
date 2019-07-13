@@ -71,6 +71,7 @@ func TestGeo(t *testing.T) {
 
 func TestGeoradius(t *testing.T) {
 	// some subway stations
+	// https://data.cityofnewyork.us/Transportation/Subway-Stations/arq3-7z49/data
 	testCommands(t,
 		succ("GEOADD",
 			"stations",

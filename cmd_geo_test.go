@@ -154,15 +154,5 @@ func TestGeo(t *testing.T) {
 		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", "abc", "def", "ghi", "m"))
 		mustFail(t, err, "ERR wrong number of arguments for 'georadius' command")
 		equals(t, 0, len(res))
-
-		// Negative coords
-		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", -15, -37, 200, "m"))
-		mustFail(t, err, "ERR wrong number of arguments for 'georadius' command")
-		equals(t, 0, len(res))
-
-		// Negative radius
-		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, -200, "m"))
-		mustFail(t, err, "ERR wrong number of arguments for 'georadius' command")
-		equals(t, 0, len(res))
 	}
 }
