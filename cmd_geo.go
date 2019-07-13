@@ -86,11 +86,6 @@ type geoRadiusResponse struct {
 }
 
 func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
-	var (
-		withDist  = false
-		withCoord = false
-	)
-
 	if len(args) < 5 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
@@ -105,13 +100,13 @@ func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
 
 	key := args[0]
 	longitude, err := strconv.ParseFloat(args[1], 64)
-	if err != nil || longitude < 0 {
+	if err != nil {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
 	}
 	latitude, err := strconv.ParseFloat(args[2], 64)
-	if err != nil || latitude < 0 {
+	if err != nil {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
@@ -138,6 +133,10 @@ func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	var (
+		withDist  = false
+		withCoord = false
+	)
 	for _, arg := range args[4:] {
 		switch strings.ToUpper(arg) {
 		case "WITHCOORD":
