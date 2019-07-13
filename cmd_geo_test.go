@@ -110,11 +110,11 @@ func TestGeo(t *testing.T) {
 		ok(t, err)
 		equals(t, 0, len(leftover))
 		equals(t, "Palermo", name1)
-		equals(t, 190.6010, dist1) // in km
+		equals(t, 190.4426, dist1) // in km
 		_, err = redis.Scan(res[1].([]interface{}), &name2, &dist2)
 		ok(t, err)
 		equals(t, "Catania", name2)
-		equals(t, 56.4881, dist2)
+		equals(t, 56.4412, dist2)
 
 		// in meter
 		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200000, "m", "WITHDIST"))
@@ -122,7 +122,7 @@ func TestGeo(t *testing.T) {
 		equals(t, 2, len(res))
 		distance, err := redis.Float64(res[0].([]interface{})[1], nil)
 		ok(t, err)
-		equals(t, 190601.0142, distance) // in meter
+		equals(t, 190442.5579, distance) // in meter
 	})
 
 	t.Run("no args", func(t *testing.T) {

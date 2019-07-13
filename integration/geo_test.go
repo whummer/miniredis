@@ -76,7 +76,10 @@ func TestGeoradius(t *testing.T) {
 			-73.98384899986625, 40.76172799961419, "50th St",
 		),
 		succ("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km"),
-		// FIXME: the distances don't match
+		succ("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "ft", "WITHDIST"),
+		succ("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "m", "WITHDIST"),
+		// FIXME: the distances don't quite match for miles or km
+		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "mi", "WITHDIST"),
 		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "WITHDIST"),
 		// redis has more precision in the coords
 		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "WITHCOORD"),

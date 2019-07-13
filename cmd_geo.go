@@ -114,16 +114,16 @@ func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
 		c.WriteError(errWrongNumber(cmd))
 		return
 	}
-	multiplier := 1.0
+	toMeter := 1.0
 	switch args[4] {
 	case "m":
-		multiplier = 1
+		toMeter = 1
 	case "km":
-		multiplier = 1000
+		toMeter = 1000
 	case "mi":
-		multiplier = 1609.34
+		toMeter = 1609.34
 	case "ft":
-		multiplier = 0.3048
+		toMeter = 0.3048
 	default:
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
@@ -147,7 +147,7 @@ func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 		members := db.ssetElements(key)
 
-		matches := withinRadius(members, longitude, latitude, radius*multiplier)
+		matches := withinRadius(members, longitude, latitude, radius*toMeter)
 
 		c.WriteLen(len(matches))
 		for _, member := range matches {
@@ -166,7 +166,7 @@ func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
 			c.WriteLen(len)
 			c.WriteBulk(member.Name)
 			if withDist {
-				c.WriteBulk(fmt.Sprintf("%.04f", member.Distance/multiplier))
+				c.WriteBulk(fmt.Sprintf("%.4f", member.Distance/toMeter))
 			}
 			if withCoord {
 				c.WriteLen(2)
