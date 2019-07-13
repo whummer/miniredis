@@ -6,6 +6,38 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
+func TestGeoadd(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	t.Run("ok", func(t *testing.T) {
+		_, err := c.Do("GEOADD", "Sicily", 13.361389, 38.115556, "Palermo")
+		ok(t, err)
+		_, err = c.Do("GEOADD", "Sicily", 15.087269, 37.502669, "Catania")
+		ok(t, err)
+	})
+
+	t.Run("failure cases", func(t *testing.T) {
+		_, err = c.Do("GEOADD", "broken", -190.0, 10.0, "hi")
+		mustFail(t, err, "ERR invalid longitude,latitude pair -190.000000,10.000000")
+		_, err = c.Do("GEOADD", "broken", 190.0, 10.0, "hi")
+		mustFail(t, err, "ERR invalid longitude,latitude pair 190.000000,10.000000")
+		_, err := c.Do("GEOADD", "broken", 10.0, -86.0, "hi")
+		mustFail(t, err, "ERR invalid longitude,latitude pair 10.000000,-86.000000")
+		_, err = c.Do("GEOADD", "broken", 10.0, 86.0, "hi")
+		mustFail(t, err, "ERR invalid longitude,latitude pair 10.000000,86.000000")
+
+		_, err = c.Do("GEOADD", "broken", "notafloat", 10.0, "hi")
+		mustFail(t, err, "ERR value is not a valid float")
+		_, err = c.Do("GEOADD", "broken", 10.0, "notafloat", "hi")
+		mustFail(t, err, "ERR value is not a valid float")
+	})
+}
+
 // Test GEOADD / GEORADIUS
 func TestGeo(t *testing.T) {
 	s, err := Run()
@@ -115,30 +147,22 @@ func TestGeo(t *testing.T) {
 
 		// Unsupported/unknown distance unit
 		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200, "mm"))
-		if err == nil {
-			t.Error("Expected error for unsupported distance unit")
-		}
+		mustFail(t, err, "ERR wrong number of arguments for 'georadius' command")
 		equals(t, 0, len(res))
 
 		// Wrong parameter type
 		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", "abc", "def", "ghi", "m"))
-		if err == nil {
-			t.Error("Expected error for wrong parameter type")
-		}
+		mustFail(t, err, "ERR wrong number of arguments for 'georadius' command")
 		equals(t, 0, len(res))
 
 		// Negative coords
 		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", -15, -37, 200, "m"))
-		if err == nil {
-			t.Error("Expected error for negative coords")
-		}
+		mustFail(t, err, "ERR wrong number of arguments for 'georadius' command")
 		equals(t, 0, len(res))
 
 		// Negative radius
 		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, -200, "m"))
-		if err == nil {
-			t.Error("Expected error for negative radius")
-		}
+		mustFail(t, err, "ERR wrong number of arguments for 'georadius' command")
 		equals(t, 0, len(res))
 	}
 }

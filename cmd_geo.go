@@ -8,8 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alicebob/miniredis/v2/server"
 	"github.com/mmcloughlin/geohash"
+
+	"github.com/alicebob/miniredis/v2/server"
 )
 
 // commandsGeo handles GEOADD, GEORADIUS etc.
@@ -31,23 +32,33 @@ func (m *Miniredis) cmdGeoAdd(c *server.Peer, cmd string, args []string) {
 	if m.checkPubsub(c) {
 		return
 	}
-	key := args[0]
+	key, args := args[0], args[1:]
 
 	newArgs := []string{key}
-	for i := range args[1:] {
-		latitude, err := strconv.ParseFloat(args[i], 64)
+	for len(args) > 2 {
+		rawLong, rawLat, name := args[0], args[1], args[2]
+		args = args[3:]
+		longitude, err := strconv.ParseFloat(rawLong, 64)
 		if err != nil {
-			continue
+			c.WriteError("ERR value is not a valid float")
+			return
 		}
-		longitude, err := strconv.ParseFloat(args[i+1], 64)
+		latitude, err := strconv.ParseFloat(rawLat, 64)
 		if err != nil {
-			continue
+			c.WriteError("ERR value is not a valid float")
+			return
 		}
 
-		name := args[i+2]
-		score := geohash.EncodeIntWithPrecision(longitude, latitude, 64)
-		newArgs = append(newArgs, fmt.Sprintf("%d", score))
-		newArgs = append(newArgs, name)
+		if latitude < -85.05112878 ||
+			latitude > 85.05112878 ||
+			longitude < -180 ||
+			longitude > 180 {
+			c.WriteError(fmt.Sprintf("ERR invalid longitude,latitude pair %.6f,%.6f", longitude, latitude))
+			return
+		}
+
+		score := geohash.EncodeIntWithPrecision(latitude, longitude, 64)
+		newArgs = append(newArgs, fmt.Sprintf("%d", score), name)
 	}
 	m.cmdZadd(c, "ZADD", newArgs)
 }
