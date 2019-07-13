@@ -34,33 +34,49 @@ func (m *Miniredis) cmdGeoAdd(c *server.Peer, cmd string, args []string) {
 	}
 	key, args := args[0], args[1:]
 
-	newArgs := []string{key}
-	for len(args) > 2 {
-		rawLong, rawLat, name := args[0], args[1], args[2]
-		args = args[3:]
-		longitude, err := strconv.ParseFloat(rawLong, 64)
-		if err != nil {
-			c.WriteError("ERR value is not a valid float")
-			return
-		}
-		latitude, err := strconv.ParseFloat(rawLat, 64)
-		if err != nil {
-			c.WriteError("ERR value is not a valid float")
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if db.exists(key) && db.t(key) != "zset" {
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
-		if latitude < -85.05112878 ||
-			latitude > 85.05112878 ||
-			longitude < -180 ||
-			longitude > 180 {
-			c.WriteError(fmt.Sprintf("ERR invalid longitude,latitude pair %.6f,%.6f", longitude, latitude))
-			return
+		toSet := map[string]float64{}
+		for len(args) > 2 {
+			rawLong, rawLat, name := args[0], args[1], args[2]
+			args = args[3:]
+			longitude, err := strconv.ParseFloat(rawLong, 64)
+			if err != nil {
+				c.WriteError("ERR value is not a valid float")
+				return
+			}
+			latitude, err := strconv.ParseFloat(rawLat, 64)
+			if err != nil {
+				c.WriteError("ERR value is not a valid float")
+				return
+			}
+
+			if latitude < -85.05112878 ||
+				latitude > 85.05112878 ||
+				longitude < -180 ||
+				longitude > 180 {
+				c.WriteError(fmt.Sprintf("ERR invalid longitude,latitude pair %.6f,%.6f", longitude, latitude))
+				return
+			}
+
+			score := geohash.EncodeIntWithPrecision(latitude, longitude, 64)
+			toSet[name] = float64(score)
 		}
 
-		score := geohash.EncodeIntWithPrecision(latitude, longitude, 64)
-		newArgs = append(newArgs, fmt.Sprintf("%d", score), name)
-	}
-	m.cmdZadd(c, "ZADD", newArgs)
+		set := 0
+		for name, score := range toSet {
+			if db.ssetAdd(key, score, name) {
+				set++
+			}
+		}
+		c.WriteInt(set)
+	})
 }
 
 type geoRadiusResponse struct {
