@@ -112,12 +112,16 @@ func Run() (*Miniredis, error) {
 
 // Start starts a server. It listens on a random port on localhost. See also
 // Addr().
-func (m *Miniredis) Start() error {
-	s, err := server.NewServer(fmt.Sprintf("127.0.0.1:%d", m.port))
+func (m *Miniredis) StartPort(port int) error {
+	s, err := server.NewServer(fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
 		return err
 	}
 	return m.start(s)
+}
+
+func (m *Miniredis) Start() error {
+       return m.StartPort(m.port)
 }
 
 // StartAddr runs miniredis with a given addr. Examples: "127.0.0.1:6379",
